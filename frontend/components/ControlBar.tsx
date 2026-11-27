@@ -6,7 +6,7 @@ import { Pause, Play, Rewind, XCircle, Loader2 } from "lucide-react";
 const STATUS_STYLE: Record<SessionStatus, string> = {
   IDLE: "bg-slate-700/40 text-slate-300",
   PLANNING: "bg-blue-500/20 text-blue-300",
-  RUNNING: "bg-cyan-500/20 text-cyan-300",
+  RUNNING: "bg-violet-500/20 text-violet-300",
   PAUSED: "bg-amber-500/20 text-amber-300",
   AWAITING_APPROVAL: "bg-fuchsia-500/20 text-fuchsia-300",
   COMPLETED: "bg-emerald-500/20 text-emerald-300",

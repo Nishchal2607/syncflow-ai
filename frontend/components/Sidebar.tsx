@@ -6,7 +6,7 @@ export default function Sidebar({
 }: { mode: string | null; onNewSession: () => void; sessionId: string | null }) {
   return (
     <aside className="sidebar">
-      <div className="px-4 py-4 flex items-center gap-2 border-b border-border">
+      <div className="px-4 py-5 flex items-center gap-3 border-b border-border">
         <span className="brand-mark"><Sparkles size={20} /></span>
         <div><span className="font-semibold text-slate-100 text-base">SyncFlow AI</span><div className="eyebrow">CONTROL CENTER</div></div>
       </div>
@@ -14,7 +14,7 @@ export default function Sidebar({
       <div className="px-3 py-3">
         <button
           onClick={onNewSession}
-          className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-accent text-black font-medium"
+          className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-2.5 rounded-lg bg-accent text-white font-semibold shadow-lg shadow-violet-500/10 hover:brightness-110"
         >
           <Plus size={13} /> New execution
         </button>

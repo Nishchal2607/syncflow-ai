@@ -15,12 +15,12 @@ const AGENT_ICON: Record<string, any> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#4b5563",
-  running: "#22d3ee",
-  completed: "#22c55e",
-  failed: "#ef4444",
-  paused: "#f59e0b",
-  skipped: "#374151",
+  pending: "#7d8198",
+  running: "#8b7cf6",
+  completed: "#69b895",
+  failed: "#e67885",
+  paused: "#dda66d",
+  skipped: "#55596d",
 };
 
 function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
@@ -32,7 +32,7 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
       className="workflow-node rounded-xl2 border px-4 py-3 w-56 shadow-lg transition-all"
       style={{
         background: "#161c25",
-        borderColor: selected ? "#22d3ee" : "#232b36",
+        borderColor: selected ? "#8b7cf6" : "#30334b",
         boxShadow: task.status === "running" ? `0 0 0 1px ${color}, 0 0 14px ${color}55` : undefined,
         opacity: task.status === "skipped" ? 0.45 : 1,
       }}

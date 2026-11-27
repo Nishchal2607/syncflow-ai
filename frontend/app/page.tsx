@@ -55,8 +55,19 @@ export default function Home() {
           <GoalInput onSubmit={handleNewGoal} />
         ) : (
           <>
-            <header className="workspace-heading"><div><div className="eyebrow">WORKSPACE / ORCHESTRATION</div><h1>Execution overview</h1></div><span className="session-label">Session · {session.id.slice(0, 8)}</span></header>
-            <div role="status">{connected ? "Live connection" : "Disconnected — reconnecting; displayed state may be stale"}</div>
+            <header className="workspace-heading">
+              <div>
+                <div className="eyebrow">WORKSPACE / ORCHESTRATION</div>
+                <h1>Execution overview</h1>
+              </div>
+              <span className="session-label rounded-full border border-border bg-bg-panel px-3 py-1.5">
+                Session · {session.id.slice(0, 8)}
+              </span>
+            </header>
+            <div className="connection-status" role="status">
+              <span className={`connection-dot ${connected ? "" : "offline"}`} />
+              {connected ? "Live connection" : "Reconnecting — displayed state may be stale"}
+            </div>
             <ControlBar
               goal={session.goal}
               status={session.status}

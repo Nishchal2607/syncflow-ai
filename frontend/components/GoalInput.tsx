@@ -29,9 +29,9 @@ export default function GoalInput({ onSubmit }: { onSubmit: (goal: string) => Pr
   return (
     <div className="goal-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-2xl">
-        <div className="flex items-center gap-2 mb-2 text-accent">
-          <Sparkles size={20} />
-          <span className="text-sm font-semibold tracking-wide uppercase">SyncFlow AI</span>
+        <div className="inline-flex items-center gap-2 mb-5 rounded-full border border-violet-400/20 bg-violet-400/[0.07] px-3 py-1.5 text-violet-300">
+          <Sparkles size={15} />
+          <span className="text-xs font-semibold tracking-wide">SyncFlow AI</span>
         </div>
         <h1 className="text-4xl font-semibold tracking-tight text-slate-100 mb-1">
           Orchestrate with confidence.
@@ -67,7 +67,7 @@ export default function GoalInput({ onSubmit }: { onSubmit: (goal: string) => Pr
               key={ex}
               disabled={submitting}
               onClick={() => submit(ex)}
-              className="block w-full text-left text-xs text-slate-400 hover:text-cyan-300 hover:border-accent border border-border rounded-lg px-3 py-2 bg-bg-elevated transition-colors"
+              className="block w-full text-left text-xs text-slate-400 hover:text-violet-200 hover:border-violet-400/40 border border-border rounded-xl px-3.5 py-3 bg-bg-elevated/80 transition-colors"
             >
               {ex}
             </button>
