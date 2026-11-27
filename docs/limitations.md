@@ -5,11 +5,10 @@ rules ("do not fabricate results or evidence", "do not claim a feature is
 implemented until tested").
 
 ## Execution engine
-- Per-session execution control (`SessionControl`) is in-process memory, not
-  persisted. A backend restart mid-session loses the ability to resume that
-  session's loop automatically (all data is still safe in SQLite; a manual
-  `/resume` call after restart would need the coordinator to re-derive
-  control state from the session's persisted status — not currently wired).
+- Per-session execution control (`SessionControl`) is in-process memory.
+  Pending approvals survive restart and are replayed through WebSocket
+  snapshots, while running/planning sessions are intentionally failed closed
+  during recovery. Automatic replay of running work is not enabled.
 - Redirect currently supports one operation: skip-and-replace a single task.
   It does not support richer graph edits (e.g. inserting a task in the
   middle of an already-completed chain, or multi-task redirects in one call).

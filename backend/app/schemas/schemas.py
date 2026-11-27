@@ -21,6 +21,14 @@ class TaskOut(BaseModel):
     evidence: Optional[list[Any]] = None
     uncertainty: Optional[str] = None
     limitations: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 2
+    timeout_seconds: int = 30
+    checkpoint: Optional[dict] = None
+    objective: Optional[str] = None
+    intended_next_action: Optional[str] = None
+    capabilities: Optional[list[str]] = None
+    human_assistance_conditions: Optional[list[str]] = None
 
     class Config:
         from_attributes = True
@@ -44,6 +52,42 @@ class RedirectRequest(BaseModel):
         None, description="Target task to redirect. Defaults to current running/next task."
     )
     instruction: str = Field(..., min_length=3, max_length=2000)
+    command_id: Optional[str] = Field(None, min_length=8, max_length=128)
+
+
+class CommandRequest(BaseModel):
+    command_id: Optional[str] = Field(None, min_length=8, max_length=128)
+    feedback: Optional[str] = Field(None, max_length=4000)
+
+
+class TaskMutationRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=3, max_length=500)
+    instruction: Optional[str] = Field(None, min_length=3, max_length=2000)
+    agent: Optional[str] = None
+    depends_on: Optional[list[str]] = None
+    reason: Optional[str] = Field(None, max_length=2000)
+    command_id: Optional[str] = Field(None, min_length=8, max_length=128)
+
+
+class ReprioritizeRequest(BaseModel):
+    task_ids: list[str] = Field(..., min_length=1)
+    reason: Optional[str] = Field(None, max_length=2000)
+    command_id: Optional[str] = Field(None, min_length=8, max_length=128)
+
+
+class InterventionOut(BaseModel):
+    id: str
+    session_id: str
+    task_id: Optional[str]
+    action: str
+    actor: str
+    reason: Optional[str]
+    before: Optional[dict]
+    after: Optional[dict]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class ApprovalOut(BaseModel):
@@ -56,6 +100,7 @@ class ApprovalOut(BaseModel):
     status: str
     created_at: datetime
     resolved_at: Optional[datetime] = None
+    feedback: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -69,6 +114,7 @@ class EventOut(BaseModel):
     task_id: Optional[str] = None
     details: Optional[dict] = None
     timestamp: datetime
+    sequence: int = 0
 
     class Config:
         from_attributes = True

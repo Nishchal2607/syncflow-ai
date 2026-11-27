@@ -9,7 +9,9 @@ per the "do not fabricate evidence" rule.
 """
 import asyncio
 import os
+from datetime import datetime, timezone
 from app.agents.llm_client import complete_json, is_live
+from app.evidence import retrieve, verify_claim
 
 # Deterministic-mode tasks are near-instant by default, which leaves no real
 # window for a human to pause/redirect mid-execution. We simulate realistic
@@ -46,12 +48,21 @@ at medium or high."""
                 "is_live": True,
             }
     await _simulate_work()
+    sources = retrieve(subject + " " + goal)
+    status = verify_claim(subject, sources)
     return {
         "result": f"[Deterministic demo] Compiled a placeholder research profile for {subject}: "
                    f"product line-up, market positioning, and publicly discussed strengths/weaknesses.",
         "explanation": "No LLM/API key configured, so this task ran in deterministic fallback mode "
                        "and did not perform real retrieval.",
-        "evidence": [f"demo-fixture:{subject.lower().replace(' ', '-')}"],
+        "evidence": sources or [{
+            "status": "insufficient_evidence",
+            "title": "Local controlled collection",
+            "url": "local://collection",
+            "document_id": "local-none",
+            "excerpt": "No matching controlled-document evidence was found.",
+            "retrieval_timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
         "uncertainty": "high",
         "limitations": "This is a simulated result for demo purposes, not verified real-world data.",
         "agent": "research",

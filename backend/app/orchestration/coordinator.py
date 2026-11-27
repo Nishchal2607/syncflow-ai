@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession as DBSession
 
-from app.database.models import Session, Task, Event, Approval, gen_id
+from app.database.models import Session, Task, Event, Approval, Command, Intervention, gen_id
 from app.database.db import AsyncSessionLocal
 from app.orchestration.state_machine import transition, InvalidTransition
 from app.agents import planner, workers
@@ -58,9 +58,12 @@ async def _commit(db):
 
 async def _log_event(db: DBSession, session_id: str, event_type: str, actor: str,
                       task_id: str | None = None, details: dict | None = None):
+    result = await db.execute(select(Event.sequence).where(Event.session_id == session_id).order_by(Event.sequence.desc()).limit(1))
+    sequence = (result.scalar_one_or_none() or 0) + 1
     evt = Event(
         id=gen_id("evt"), session_id=session_id, event_type=event_type,
         actor=actor, task_id=task_id, details=details or {},
+        sequence=sequence,
     )
     db.add(evt)
     await db.flush()
@@ -70,6 +73,7 @@ async def _log_event(db: DBSession, session_id: str, event_type: str, actor: str
             "id": evt.id, "session_id": session_id, "event_type": event_type,
             "actor": actor, "task_id": task_id, "details": details or {},
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "sequence": sequence,
         },
     })
     return evt
@@ -95,6 +99,14 @@ async def _broadcast_task(db, session_id: str, task: Task):
             "depends_on": task.depends_on, "result": task.result,
             "explanation": task.explanation, "evidence": task.evidence,
             "uncertainty": task.uncertainty, "limitations": task.limitations,
+            "retry_count": task.retry_count,
+            "max_retries": task.max_retries,
+            "timeout_seconds": task.timeout_seconds,
+            "checkpoint": task.checkpoint or {},
+            "objective": task.objective,
+            "intended_next_action": task.intended_next_action,
+            "capabilities": task.capabilities or [],
+            "human_assistance_conditions": task.human_assistance_conditions or [],
         },
     })
 
@@ -120,6 +132,7 @@ async def start_session(session_id: str):
             if session is None:
                 raise ValueError("session not found")
             await _set_session_status(db, session, "PLANNING")
+            session.execution_epoch = (session.execution_epoch or 0) + 1
             await _log_event(db, session_id, "plan_generation_started", "coordinator")
             await _commit(db)
 
@@ -136,6 +149,10 @@ async def start_session(session_id: str):
                 created.append(Task(
                     id=gen_id("task"), session_id=session_id, name=spec["name"],
                     agent=spec["agent"], status="pending", order_index=i, depends_on=[],
+                    objective=spec["name"],
+                    intended_next_action="Execute assigned task after dependencies complete",
+                    capabilities=[spec["agent"]],
+                    human_assistance_conditions=["failure", "high uncertainty", "approval required"],
                 ))
             db.add_all(created)
             await db.flush()
@@ -159,6 +176,74 @@ async def _fetch_goal(session_id: str) -> str:
     async with AsyncSessionLocal() as db:
         session = await db.get(Session, session_id)
         return session.goal
+
+
+async def _execute_task_with_recovery(
+    session_id: str,
+    task_id: str,
+    agent: str,
+    task_name: str,
+    goal: str,
+) -> dict:
+    async with AsyncSessionLocal() as db:
+        task = await db.get(Task, task_id)
+        max_retries = task.max_retries
+        timeout_seconds = task.timeout_seconds
+
+    last_error: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            async def execute():
+                if agent == "research":
+                    ctx = await _gather_completed_summaries(session_id)
+                    return await workers.run_research(task_name, goal + "\nPrior outputs: " + "\n".join(ctx))
+                if agent == "verification":
+                    ctx = await _gather_completed_summaries(session_id)
+                    return await workers.run_verification(ctx, f"{goal}\nTask: {task_name}")
+                if agent == "reporter":
+                    ctx = await _gather_completed_outputs(session_id)
+                    return await workers.run_reporter(ctx, f"{goal}\nTask: {task_name}")
+                return {
+                    "result": "",
+                    "explanation": "",
+                    "evidence": [],
+                    "uncertainty": "high",
+                    "limitations": "unknown agent",
+                }
+
+            return await asyncio.wait_for(execute(), timeout=timeout_seconds)
+        except Exception as exc:
+            last_error = exc
+            if attempt < max_retries:
+                async with AsyncSessionLocal() as db:
+                    task = await db.get(Task, task_id)
+                    task.retry_count = attempt + 1
+                    task.checkpoint = {
+                        "attempt": attempt + 1,
+                        "error": str(exc),
+                        "checkpointed_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    await db.flush()
+                    await _broadcast_task(db, session_id, task)
+                    await _log_event(
+                        db, session_id, "task_retry", agent, task_id=task_id,
+                        details={"attempt": attempt + 1, "error": str(exc)},
+                    )
+                    await db.commit()
+    raise last_error or RuntimeError("task execution failed")
+
+
+async def _is_current_execution(session_id: str, task_id: str, epoch: int) -> bool:
+    async with AsyncSessionLocal() as db:
+        session = await db.get(Session, session_id)
+        task = await db.get(Task, task_id)
+        return bool(
+            session
+            and task
+            and session.execution_epoch == epoch
+            and session.status in ("RUNNING", "AWAITING_APPROVAL")
+            and task.status == "running"
+        )
 
 
 async def _run_loop(session_id: str):
@@ -219,22 +304,16 @@ async def _run_loop(session_id: str):
                 agent = next_task.agent
                 task_id = next_task.id
                 task_name = next_task.name
+                execution_epoch = session.execution_epoch
 
             # Execute outside the DB transaction (agent calls may be slow / network)
             try:
-                if agent == "research":
-                    ctx = await _gather_completed_summaries(session_id)
-                    output = await workers.run_research(task_name, goal + "\nPrior outputs: " + "\n".join(ctx))
-                elif agent == "verification":
-                    ctx = await _gather_completed_summaries(session_id)
-                    output = await workers.run_verification(ctx, f"{goal}\nTask: {task_name}")
-                elif agent == "reporter":
-                    ctx = await _gather_completed_outputs(session_id)
-                    output = await workers.run_reporter(ctx, f"{goal}\nTask: {task_name}")
-                else:
-                    output = {"result": "", "explanation": "", "evidence": [],
-                              "uncertainty": "high", "limitations": "unknown agent"}
+                output = await _execute_task_with_recovery(
+                    session_id, task_id, agent, task_name, goal
+                )
             except Exception as exc:
+                if not await _is_current_execution(session_id, task_id, execution_epoch):
+                    return
                 async with AsyncSessionLocal() as db:
                     session = await db.get(Session, session_id)
                     task = await db.get(Task, task_id)
@@ -246,6 +325,9 @@ async def _run_loop(session_id: str):
                                       details={"error": str(exc)})
                     await _set_session_status(db, session, "FAILED")
                     await _commit(db)
+                return
+
+            if not await _is_current_execution(session_id, task_id, execution_epoch):
                 return
 
             # Reporter output is a consequential action -> gate behind human approval
@@ -343,6 +425,7 @@ async def _pause_session(session_id: str):
             await asyncio.gather(control.running_task_future, return_exceptions=True)
         await db.refresh(session)
         await _set_session_status(db, session, "PAUSED")
+        session.execution_epoch = (session.execution_epoch or 0) + 1
         tasks = (await db.execute(select(Task).where(Task.session_id == session_id, Task.status == "running"))).scalars().all()
         for task in tasks:
             task.status = "pending"
@@ -366,6 +449,7 @@ async def _resume_session(session_id: str):
         if session.status != "PAUSED":
             raise InvalidTransition(session.status, "RUNNING")
         await _set_session_status(db, session, "RUNNING")
+        session.execution_epoch = (session.execution_epoch or 0) + 1
         await _log_event(db, session_id, "agent_resumed", "human")
         await _commit(db)
     control.resume_event.set()
@@ -406,6 +490,7 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
         if target is None or target.status != "pending":
             raise ValueError("only pending tasks can be redirected")
 
+        session.execution_epoch = (session.execution_epoch or 0) + 1
         # Mark the target skipped and insert a new task in its place, preserving
         # dependency edges so downstream tasks (e.g. "Compare results") now wait
         # on the *new* task instead.
@@ -449,6 +534,7 @@ async def _cancel_session(session_id: str):
             await asyncio.gather(control.running_task_future, return_exceptions=True)
         await db.refresh(session)
         await _set_session_status(db, session, "CANCELLED")
+        session.execution_epoch = (session.execution_epoch or 0) + 1
         session.current_task_id = None
         for task in (await db.execute(select(Task).where(Task.session_id == session_id, Task.status.in_(["pending", "running"])))).scalars():
             task.status = "skipped"
@@ -499,7 +585,7 @@ async def _approve_action(approval_id: str):
         control.running_task_future = asyncio.create_task(_run_loop(session_id))
 
 
-async def _reject_action(approval_id: str):
+async def _reject_action(approval_id: str, feedback: str | None = None):
     async with AsyncSessionLocal() as db:
         approval = await db.get(Approval, approval_id)
         if approval is None:
@@ -510,16 +596,31 @@ async def _reject_action(approval_id: str):
             raise ValueError("approval already resolved")
         approval.status = "rejected"
         approval.resolved_at = datetime.now(timezone.utc)
+        approval.feedback = feedback
         session = await db.get(Session, approval.session_id)
         task = await db.get(Task, approval.task_id) if approval.task_id else None
         if session.status != "AWAITING_APPROVAL" or not task or task.status != "running":
             raise InvalidTransition(session.status, "AWAITING_APPROVAL")
         if task:
-            task.status = "failed"
+            task.status = "pending"
+            task.checkpoint = {
+                "stage": "awaiting_revision",
+                "feedback": feedback or "",
+                "previous_result": task.result,
+            }
             await _broadcast_task(db, session.id, task)
-        await _set_session_status(db, session, "FAILED")
+        await _set_session_status(db, session, "PAUSED")
         await _log_event(db, session.id, "approval_rejected", "human", task_id=approval.task_id,
-                          details={"approval_id": approval_id})
+                          details={"approval_id": approval_id, "feedback": feedback or ""})
+        db.add(Intervention(
+            session_id=session.id,
+            task_id=approval.task_id,
+            action="reject",
+            actor="human",
+            reason=feedback,
+            before={"status": "AWAITING_APPROVAL"},
+            after={"status": "PAUSED", "task_status": "pending"},
+        ))
         await _queue(db, session.id, {
             "type": "approval_resolved",
             "approval_id": approval_id, "status": "rejected",
@@ -551,27 +652,197 @@ async def recover_sessions():
         await _fail(sid, RuntimeError("Execution interrupted by server restart"))
 
 # Serialize human commands within the supported single server process.
-async def pause_session(session_id):
+async def _execute_idempotent(session_id: str, command_id: str | None,
+                              command_type: str, action):
+    if not command_id:
+        await action()
+        return
+    async with AsyncSessionLocal() as db:
+        existing = await db.scalar(
+            select(Command).where(
+                Command.session_id == session_id,
+                Command.command_id == command_id,
+            )
+        )
+        if existing:
+            return existing.result
     async with _get_control(session_id).lock:
-        await _pause_session(session_id)
-async def resume_session(session_id):
-    async with _get_control(session_id).lock:
-        await _resume_session(session_id)
-async def redirect_session(session_id, instruction, task_id):
-    async with _get_control(session_id).lock:
-        await _redirect_session(session_id, instruction, task_id)
-async def cancel_session(session_id):
-    async with _get_control(session_id).lock:
-        await _cancel_session(session_id)
-async def _resolve(approval_id, action):
+        async with AsyncSessionLocal() as db:
+            existing = await db.scalar(
+                select(Command).where(
+                    Command.session_id == session_id,
+                    Command.command_id == command_id,
+                )
+            )
+            if existing:
+                return existing.result
+        await action()
+        async with AsyncSessionLocal() as db:
+            db.add(Command(
+                session_id=session_id,
+                command_id=command_id,
+                command_type=command_type,
+                result={"accepted": True},
+            ))
+            await db.commit()
+
+
+async def pause_session(session_id, command_id: str | None = None):
+    await _execute_idempotent(
+        session_id, command_id, "pause",
+        lambda: _pause_session(session_id),
+    )
+async def resume_session(session_id, command_id: str | None = None):
+    await _execute_idempotent(
+        session_id, command_id, "resume",
+        lambda: _resume_session(session_id),
+    )
+async def redirect_session(session_id, instruction, task_id, command_id: str | None = None):
+    await _execute_idempotent(
+        session_id, command_id, "redirect",
+        lambda: _redirect_session(session_id, instruction, task_id),
+    )
+async def cancel_session(session_id, command_id: str | None = None):
+    await _execute_idempotent(
+        session_id, command_id, "cancel",
+        lambda: _cancel_session(session_id),
+    )
+async def edit_task(session_id: str, task_id: str, name: str | None = None,
+                    agent: str | None = None, depends_on: list[str] | None = None,
+                    reason: str | None = None, command_id: str | None = None):
+    async def action():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(Session, session_id)
+            task = await db.get(Task, task_id)
+            if not session or not task:
+                raise ValueError("session or task not found")
+            if session.status != "PAUSED" or task.status not in ("pending", "paused"):
+                raise InvalidTransition(session.status, "PAUSED")
+            before = {"name": task.name, "agent": task.agent, "depends_on": task.depends_on}
+            if name:
+                task.name = name
+            if agent and agent in {"planner", "research", "verification", "reporter"}:
+                task.agent = agent
+            if depends_on is not None:
+                valid_ids = set((await db.execute(select(Task.id).where(Task.session_id == session_id))).scalars())
+                if any(dep not in valid_ids or dep == task_id for dep in depends_on):
+                    raise ValueError("invalid task dependency")
+                task.depends_on = depends_on
+            await db.flush()
+            await _broadcast_task(db, session_id, task)
+            db.add(Intervention(
+                session_id=session_id, task_id=task_id, action="edit_task",
+                reason=reason, before=before,
+                after={"name": task.name, "agent": task.agent, "depends_on": task.depends_on},
+            ))
+            await _log_event(db, session_id, "task_edited", "human", task_id=task_id,
+                              details={"reason": reason})
+            await db.commit()
+    await _execute_idempotent(session_id, command_id, "edit_task", action)
+
+
+async def add_task(session_id: str, name: str, agent: str,
+                   depends_on: list[str] | None = None, reason: str | None = None,
+                   command_id: str | None = None):
+    async def action():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(Session, session_id)
+            if not session:
+                raise ValueError("session not found")
+            if session.status != "PAUSED":
+                raise InvalidTransition(session.status, "PAUSED")
+            if agent not in {"planner", "research", "verification", "reporter"}:
+                raise ValueError("invalid agent")
+            valid_ids = set((await db.execute(select(Task.id).where(Task.session_id == session_id))).scalars())
+            deps = depends_on or []
+            if any(dep not in valid_ids for dep in deps):
+                raise ValueError("invalid task dependency")
+            count = (await db.execute(select(Task).where(Task.session_id == session_id))).scalars().all()
+            task = Task(
+                id=gen_id("task"), session_id=session_id, name=name, agent=agent,
+                status="pending", order_index=max([t.order_index for t in count], default=-1) + 1,
+                depends_on=deps,
+            )
+            db.add(task)
+            await db.flush()
+            await _broadcast_task(db, session_id, task)
+            db.add(Intervention(
+                session_id=session_id, task_id=task.id, action="add_task",
+                reason=reason, before={}, after={"name": name, "agent": agent, "depends_on": deps},
+            ))
+            await _log_event(db, session_id, "task_added", "human", task_id=task.id,
+                              details={"reason": reason})
+            await db.commit()
+    await _execute_idempotent(session_id, command_id, "add_task", action)
+
+
+async def remove_task(session_id: str, task_id: str, reason: str | None = None,
+                      command_id: str | None = None):
+    async def action():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(Session, session_id)
+            task = await db.get(Task, task_id)
+            if not session or not task:
+                raise ValueError("session or task not found")
+            if session.status != "PAUSED" or task.status not in ("pending", "paused"):
+                raise InvalidTransition(session.status, "PAUSED")
+            before = {"status": task.status, "name": task.name}
+            task.status = "skipped"
+            task.limitations = (task.limitations or "") + (f" Removed by human: {reason}" if reason else "")
+            for downstream in (await db.execute(select(Task).where(Task.session_id == session_id))).scalars():
+                if task_id in (downstream.depends_on or []):
+                    downstream.depends_on = [dep for dep in downstream.depends_on if dep != task_id]
+                    await _broadcast_task(db, session_id, downstream)
+            await db.flush()
+            await _broadcast_task(db, session_id, task)
+            db.add(Intervention(
+                session_id=session_id, task_id=task_id, action="remove_task",
+                reason=reason, before=before, after={"status": "skipped"},
+            ))
+            await _log_event(db, session_id, "task_removed", "human", task_id=task_id,
+                              details={"reason": reason})
+            await db.commit()
+    await _execute_idempotent(session_id, command_id, "remove_task", action)
+
+
+async def reprioritize_tasks(session_id: str, task_ids: list[str],
+                             reason: str | None = None, command_id: str | None = None):
+    async def action():
+        async with AsyncSessionLocal() as db:
+            session = await db.get(Session, session_id)
+            if not session:
+                raise ValueError("session not found")
+            if session.status != "PAUSED":
+                raise InvalidTransition(session.status, "PAUSED")
+            tasks = (await db.execute(select(Task).where(Task.session_id == session_id))).scalars().all()
+            by_id = {task.id: task for task in tasks}
+            if set(task_ids) != set(by_id) or len(task_ids) != len(set(task_ids)):
+                raise ValueError("task_ids must contain every task exactly once")
+            before = {task.id: task.order_index for task in tasks}
+            for index, task_id in enumerate(task_ids):
+                by_id[task_id].order_index = index
+                await _broadcast_task(db, session_id, by_id[task_id])
+            db.add(Intervention(
+                session_id=session_id, action="reprioritize", reason=reason,
+                before=before, after={task_id: index for index, task_id in enumerate(task_ids)},
+            ))
+            await _log_event(db, session_id, "tasks_reprioritized", "human",
+                              details={"reason": reason, "task_ids": task_ids})
+            await db.commit()
+    await _execute_idempotent(session_id, command_id, "reprioritize", action)
+async def _resolve(approval_id, action, command_id: str | None = None, command_type: str = "approval"):
     async with AsyncSessionLocal() as db:
         approval = await db.get(Approval, approval_id)
         if not approval:
             raise ValueError("approval not found")
         sid = approval.session_id
-    async with _get_control(sid).lock:
-        await action(approval_id)
-async def approve_action(approval_id):
-    await _resolve(approval_id, _approve_action)
-async def reject_action(approval_id):
-    await _resolve(approval_id, _reject_action)
+    await _execute_idempotent(sid, command_id, command_type, lambda: action(approval_id))
+async def approve_action(approval_id, command_id: str | None = None):
+    await _resolve(approval_id, _approve_action, command_id, "approve")
+async def reject_action(approval_id, command_id: str | None = None, feedback: str | None = None):
+    await _resolve(
+        approval_id,
+        lambda resolved_id: _reject_action(resolved_id, feedback),
+        command_id,
+        "reject",
+    )

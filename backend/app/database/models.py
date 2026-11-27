@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, String, DateTime, ForeignKey, Integer, JSON, Text
+    Column, String, DateTime, ForeignKey, Integer, JSON, Text, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -26,6 +26,7 @@ class Session(Base):
     status = Column(String, nullable=False, default="IDLE")
     # Saved execution cursor so RESUME continues from exact state
     current_task_id = Column(String, nullable=True)
+    execution_epoch = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=now)
     updated_at = Column(DateTime, default=now, onupdate=now)
 
@@ -51,6 +52,14 @@ class Task(Base):
     evidence = Column(JSON, nullable=True, default=list)
     uncertainty = Column(String, nullable=True)  # low | medium | high
     limitations = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=2)
+    timeout_seconds = Column(Integer, nullable=False, default=30)
+    checkpoint = Column(JSON, nullable=True, default=dict)
+    objective = Column(Text, nullable=True)
+    intended_next_action = Column(Text, nullable=True)
+    capabilities = Column(JSON, nullable=True, default=list)
+    human_assistance_conditions = Column(JSON, nullable=True, default=list)
 
     created_at = Column(DateTime, default=now)
     updated_at = Column(DateTime, default=now, onupdate=now)
@@ -68,6 +77,7 @@ class Event(Base):
     task_id = Column(String, nullable=True)
     details = Column(JSON, nullable=True, default=dict)
     timestamp = Column(DateTime, default=now)
+    sequence = Column(Integer, nullable=False, default=0)
 
     session = relationship("Session", back_populates="events")
 
@@ -84,5 +94,32 @@ class Approval(Base):
     status = Column(String, nullable=False, default="pending")  # pending | approved | rejected
     created_at = Column(DateTime, default=now)
     resolved_at = Column(DateTime, nullable=True)
+    feedback = Column(Text, nullable=True)
 
     session = relationship("Session", back_populates="approvals")
+
+
+class Command(Base):
+    __tablename__ = "commands"
+    __table_args__ = (UniqueConstraint("session_id", "command_id", name="uq_command_session"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False)
+    command_id = Column(String, nullable=False)
+    command_type = Column(String, nullable=False)
+    result = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=now)
+
+
+class Intervention(Base):
+    __tablename__ = "interventions"
+
+    id = Column(String, primary_key=True, default=lambda: gen_id("int"))
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False)
+    task_id = Column(String, nullable=True)
+    action = Column(String, nullable=False)
+    actor = Column(String, nullable=False, default="human")
+    reason = Column(Text, nullable=True)
+    before = Column(JSON, nullable=True, default=dict)
+    after = Column(JSON, nullable=True, default=dict)
+    created_at = Column(DateTime, default=now)

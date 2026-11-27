@@ -5,17 +5,10 @@ export default function Sidebar({
   mode, onNewSession, sessionId,
 }: { mode: string | null; onNewSession: () => void; sessionId: string | null }) {
   return (
-<<<<<<< HEAD
     <aside className="sidebar">
       <div className="px-4 py-4 flex items-center gap-2 border-b border-border">
         <span className="brand-mark"><Sparkles size={20} /></span>
         <div><span className="font-semibold text-slate-100 text-base">SyncFlow AI</span><div className="eyebrow">CONTROL CENTER</div></div>
-=======
-    <aside className="w-60 shrink-0 border-r border-border bg-bg-panel flex flex-col">
-      <div className="px-4 py-4 flex items-center gap-2 border-b border-border">
-        <Sparkles size={18} className="text-accent" />
-        <span className="font-semibold text-slate-100 text-sm">SyncFlow AI</span>
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
       </div>
 
       <div className="px-3 py-3">
@@ -23,11 +16,7 @@ export default function Sidebar({
           onClick={onNewSession}
           className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-accent text-black font-medium"
         >
-<<<<<<< HEAD
           <Plus size={13} /> New execution
-=======
-          <Plus size={13} /> New task
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         </button>
       </div>
 
@@ -43,11 +32,7 @@ export default function Sidebar({
         )}
       </div>
 
-<<<<<<< HEAD
       <div className="engine-mode mt-auto px-4 py-3 border-t border-border text-[11px] text-slate-600">
-=======
-      <div className="mt-auto px-4 py-3 border-t border-border text-[11px] text-slate-600">
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         Engine mode:{" "}
         <span className={mode === "llm" ? "text-emerald-400" : "text-amber-400"}>
           {mode === "llm" ? "Live LLM" : mode === null ? "…" : "Deterministic demo"}

@@ -15,6 +15,7 @@ export function useSession(sessionId: string | null) {
   const [connected, setConnected] = useState(false);
   const generation = useRef(0);
   const activeId = useRef<string | null>(null);
+  const lastSequence = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!sessionId) return;
@@ -51,7 +52,14 @@ export function useSession(sessionId: string | null) {
         generation.current++;
         let msg: any;
         try { msg = JSON.parse(ev.data); } catch { return; }
-        if (msg.type === "session_status") {
+        if (typeof msg.sequence === "number") {
+          lastSequence.current = Math.max(lastSequence.current, msg.sequence);
+        }
+        if (msg.type === "snapshot") {
+          setSession((prev) => (prev ? { ...prev, status: msg.session.status, current_task_id: msg.session.current_task_id } : prev));
+          setEvents((prev) => mergeEvents(prev, msg.events));
+          setPendingApproval(msg.pending_approvals?.[0] ?? null);
+        } else if (msg.type === "session_status") {
           setSession((prev) => (prev ? { ...prev, status: msg.status } : prev));
         } else if (msg.type === "task_update") {
           const t: Task = msg.task;

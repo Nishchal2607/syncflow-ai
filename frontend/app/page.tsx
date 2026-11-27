@@ -99,9 +99,9 @@ export default function Home() {
               await refresh();
             })
           }
-          onReject={() =>
+          onReject={(feedback) =>
             withBusy(async () => {
-              await api.reject(pendingApproval.id);
+              await api.reject(pendingApproval.id, feedback);
               setPendingApproval(null);
               await refresh();
             })

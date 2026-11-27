@@ -34,32 +34,18 @@ export default function ControlBar({
   const canCancel = !["COMPLETED", "FAILED", "CANCELLED"].includes(status);
 
   return (
-<<<<<<< HEAD
     <div className="control-bar panel">
       <div className="flex-1 min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
         <div className="text-sm text-slate-200 break-words">{goal}</div>
-=======
-    <div className="border-b border-border px-4 py-3 flex items-center gap-4 bg-bg-panel">
-      <div className="flex-1 min-w-0">
-        <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
-        <div className="text-sm text-slate-200 truncate">{goal}</div>
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
       </div>
 
       <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_STYLE[status]}`}>
         {busy && <Loader2 size={11} className="inline mr-1 animate-spin" />}
-<<<<<<< HEAD
         {status.replace(/_/g, " ")}
       </span>
 
       <div className="intervention-buttons flex flex-wrap items-center gap-2">
-=======
-        {status.replace("_", " ")}
-      </span>
-
-      <div className="flex items-center gap-2">
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         <button
           disabled={!canPause || busy}
           onClick={onPause}
@@ -91,13 +77,8 @@ export default function ControlBar({
       </div>
 
       {redirecting && (
-<<<<<<< HEAD
         <div className="fixed inset-0 p-4 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-bg-panel border border-border rounded-xl2 p-5 w-full max-w-[440px] shadow-2xl">
-=======
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-bg-panel border border-border rounded-xl2 p-5 w-[440px] shadow-2xl">
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
             <div className="text-sm font-medium mb-1">Redirect execution</div>
             <div className="text-xs text-slate-500 mb-3">
               Describe how to change the current/next task. The backend will update the task graph.

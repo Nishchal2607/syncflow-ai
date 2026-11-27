@@ -41,9 +41,10 @@ repeatable walkthrough (pause → redirect → resume → approve).
 cd backend
 pytest -q
 ```
-7 integration tests cover the state machine, the happy path to completion,
-pause→redirect→resume, redirect-rejected-when-not-paused, cancel, approval
-rejection, and duplicate-start protection — all passing as of this prototype.
+20 automated backend tests currently cover state transitions, happy-path
+execution, pause/redirect/resume, cancellation, rejection/revision state,
+duplicate start and command handling, approval persistence, event sequence,
+controlled evidence retrieval and prompt-injection filtering.
 
 ## Project structure
 ```

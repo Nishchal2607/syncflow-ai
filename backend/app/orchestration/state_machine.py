@@ -27,7 +27,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "PLANNING": {"RUNNING", "FAILED", "CANCELLED"},
     "RUNNING": {"PAUSED", "AWAITING_APPROVAL", "COMPLETED", "FAILED", "CANCELLED"},
     "PAUSED": {"RUNNING", "CANCELLED", "PAUSED"},  # redirect while paused keeps it PAUSED
-    "AWAITING_APPROVAL": {"RUNNING", "CANCELLED", "FAILED"},
+    "AWAITING_APPROVAL": {"RUNNING", "PAUSED", "CANCELLED", "FAILED"},
     "COMPLETED": set(),
     "FAILED": set(),
     "CANCELLED": set(),

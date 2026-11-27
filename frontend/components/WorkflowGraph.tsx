@@ -1,13 +1,7 @@
 "use client";
-<<<<<<< HEAD
 import { useEffect, useMemo } from "react";
 import ReactFlow, {
   Background, Controls, Node, Edge, MarkerType, Position, Handle, MiniMap, useReactFlow,
-=======
-import { useMemo } from "react";
-import ReactFlow, {
-  Background, Controls, Node, Edge, MarkerType, Position,
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Task } from "@/types";
@@ -35,11 +29,7 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
   const color = STATUS_COLOR[task.status] || "#4b5563";
   return (
     <div
-<<<<<<< HEAD
       className="workflow-node rounded-xl2 border px-4 py-3 w-56 shadow-lg transition-all"
-=======
-      className="rounded-xl2 border px-3 py-2 w-56 shadow-lg transition-all"
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
       style={{
         background: "#161c25",
         borderColor: selected ? "#22d3ee" : "#232b36",
@@ -47,13 +37,9 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
         opacity: task.status === "skipped" ? 0.45 : 1,
       }}
     >
-<<<<<<< HEAD
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       <div className="flex items-center justify-between mb-3">
-=======
-      <div className="flex items-center justify-between mb-1">
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-400">
           <Icon size={12} />
           {task.agent}
@@ -72,7 +58,6 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
 
 const nodeTypes = { taskNode: TaskNode };
 
-<<<<<<< HEAD
 // fitView only runs on mount; tasks usually arrive afterwards, so refit when the count changes.
 function RefitOnChange({ count }: { count: number }) {
   const { fitView } = useReactFlow();
@@ -82,27 +67,16 @@ function RefitOnChange({ count }: { count: number }) {
   }, [count, fitView]);
   return null;
 }
-
-=======
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 export default function WorkflowGraph({
   tasks, selectedId, onSelect,
 }: { tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
   const { nodes, edges } = useMemo(() => {
     const sorted = [...tasks].sort((a, b) => a.order_index - b.order_index);
-<<<<<<< HEAD
     const colWidth = 290;
     const nodes: Node[] = sorted.map((t, i) => ({
       id: t.id,
       type: "taskNode",
       position: { x: i * colWidth, y: (i % 2) * 125 },
-=======
-    const colWidth = 260;
-    const nodes: Node[] = sorted.map((t, i) => ({
-      id: t.id,
-      type: "taskNode",
-      position: { x: i * colWidth, y: (i % 2) * 90 },
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
       data: { task: t, selected: t.id === selectedId },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -115,11 +89,7 @@ export default function WorkflowGraph({
           source: dep,
           target: t.id,
           animated: t.status === "running",
-<<<<<<< HEAD
           style: { stroke: t.status === "running" ? "#22d3ee" : "#52647d", strokeWidth: 1.8 },
-=======
-          style: { stroke: "#334155" },
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
           markerEnd: { type: MarkerType.ArrowClosed, color: "#334155" },
         });
       });
@@ -128,11 +98,7 @@ export default function WorkflowGraph({
   }, [tasks, selectedId]);
 
   return (
-<<<<<<< HEAD
     <div className="graph-shell"><div className="panel-heading flex items-center justify-between"><span>Workflow graph</span><span className="event-count">{tasks.length} tasks</span></div><div className="graph-canvas">
-=======
-    <div className="h-full w-full">
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -142,18 +108,11 @@ export default function WorkflowGraph({
         proOptions={{ hideAttribution: true }}
         minZoom={0.3}
       >
-<<<<<<< HEAD
         <RefitOnChange count={tasks.length} />
         <Background color="#1b2330" gap={18} />
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable nodeColor={(n) => STATUS_COLOR[n.data?.task?.status] || "#475569"} maskColor="rgba(8,13,23,.65)" />
       </ReactFlow>
     </div><div className="graph-legend">{Object.entries(STATUS_COLOR).map(([status,color])=><span key={status}><i style={{background:color}} />{status}</span>)}</div></div>
-=======
-        <Background color="#1b2330" gap={18} />
-        <Controls showInteractive={false} />
-      </ReactFlow>
-    </div>
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
   );
 }
