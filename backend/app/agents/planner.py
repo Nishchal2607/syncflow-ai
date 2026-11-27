@@ -85,6 +85,7 @@ async def generate_plan(goal: str) -> tuple[list[dict], bool]:
     if is_live():
         result = await complete_json(SYSTEM_PROMPT, f"Goal: {goal}")
         if result and isinstance(result.get("tasks"), list) and len(result["tasks"]) > 0:
+<<<<<<< HEAD
             tasks = result["tasks"]
             if valid_plan(tasks):
                 return tasks, True
@@ -103,3 +104,16 @@ def valid_plan(tasks):
         if not isinstance(deps, list) or any(type(d) is not int or not 0 <= d < i for d in deps) or len(set(deps)) != len(deps):
             return False
     return tasks[-1]["agent"] == "reporter" and sum(t["agent"] == "reporter" for t in tasks) == 1
+=======
+            valid = []
+            for t in result["tasks"]:
+                if "name" in t and t.get("agent") in ("research", "verification", "reporter"):
+                    valid.append({
+                        "name": str(t["name"])[:200],
+                        "agent": t["agent"],
+                        "depends_on_index": t.get("depends_on_index", []) or [],
+                    })
+            if valid:
+                return valid, True
+    return deterministic_plan(goal), False
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3

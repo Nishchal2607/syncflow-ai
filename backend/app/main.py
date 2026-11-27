@@ -13,8 +13,11 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+<<<<<<< HEAD
     from app.orchestration.coordinator import recover_sessions
     await recover_sessions()
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     yield
 
 

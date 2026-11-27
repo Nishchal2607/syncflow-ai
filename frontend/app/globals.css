@@ -12,6 +12,7 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 
 .react-flow__attribution { display: none; }
+<<<<<<< HEAD
 
 :root { color-scheme: dark; }
 body { margin:0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #090e18; }
@@ -58,3 +59,5 @@ button:disabled { cursor:not-allowed; }
 @media(min-width:1100px) { .workspace { height:100dvh; } .workspace-main { overflow-y:auto; } }
 @media(max-width:1099px) { .workspace-main { padding:16px; } .execution-grid { grid-template-columns:1fr; } .inspector-content { max-height:420px; } }
 @media(max-width:700px) { .workspace { flex-direction:column; } .sidebar { width:100%; border-right:0; border-bottom:1px solid #253145; } .sidebar .engine-mode { margin-top:12px; } .workspace-main { padding:12px; gap:12px; } .workspace-heading { align-items:flex-start; flex-direction:column; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .event-row { grid-template-columns:65px 72px minmax(0,1fr); gap:6px; } .react-flow__minimap { display:none; } }
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3

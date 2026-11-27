@@ -48,6 +48,7 @@ def _get_control(session_id: str) -> SessionControl:
     return _controls[session_id]
 
 
+<<<<<<< HEAD
 async def _queue(db, session_id, message):
     db.info.setdefault("messages", []).append((session_id, message))
 
@@ -56,6 +57,8 @@ async def _commit(db):
     for session_id, message in db.info.pop("messages", []):
         await manager.broadcast(session_id, message)
 
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 async def _log_event(db: DBSession, session_id: str, event_type: str, actor: str,
                       task_id: str | None = None, details: dict | None = None):
     evt = Event(
@@ -64,7 +67,11 @@ async def _log_event(db: DBSession, session_id: str, event_type: str, actor: str
     )
     db.add(evt)
     await db.flush()
+<<<<<<< HEAD
     await _queue(db, session_id, {
+=======
+    await manager.broadcast(session_id, {
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         "type": "event",
         "event": {
             "id": evt.id, "session_id": session_id, "event_type": event_type,
@@ -79,15 +86,24 @@ async def _set_session_status(db: DBSession, session: Session, target: str):
     new_status = transition(session.status, target)
     session.status = new_status
     await db.flush()
+<<<<<<< HEAD
     await _queue(db, session.id, {
+=======
+    await manager.broadcast(session.id, {
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         "type": "session_status",
         "status": new_status,
         "session_id": session.id,
     })
 
 
+<<<<<<< HEAD
 async def _broadcast_task(db, session_id: str, task: Task):
     await _queue(db, session_id, {
+=======
+async def _broadcast_task(session_id: str, task: Task):
+    await manager.broadcast(session_id, {
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         "type": "task_update",
         "task": {
             "id": task.id, "name": task.name, "agent": task.agent,
@@ -105,7 +121,11 @@ async def create_session(goal: str) -> Session:
         db.add(session)
         await db.flush()
         await _log_event(db, session.id, "session_created", "human", details={"goal": goal})
+<<<<<<< HEAD
         await _commit(db)
+=======
+        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         await db.refresh(session)
         return session
 
@@ -121,6 +141,7 @@ async def start_session(session_id: str):
                 raise ValueError("session not found")
             await _set_session_status(db, session, "PLANNING")
             await _log_event(db, session_id, "plan_generation_started", "coordinator")
+<<<<<<< HEAD
             await _commit(db)
 
         try:
@@ -128,6 +149,13 @@ async def start_session(session_id: str):
         except Exception as exc:
             await _fail(session_id, exc)
             return
+=======
+            await db.commit()
+
+        tasks_spec, used_llm = await planner.generate_plan(
+            (await _fetch_goal(session_id))
+        )
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
         async with AsyncSessionLocal() as db:
             session = await db.get(Session, session_id)
@@ -146,9 +174,15 @@ async def start_session(session_id: str):
             await _log_event(db, session_id, "plan_generated", "planner",
                               details={"used_llm": used_llm, "task_count": len(created)})
             for t in created:
+<<<<<<< HEAD
                 await _broadcast_task(db, session_id, t)
             await _set_session_status(db, session, "RUNNING")
             await _commit(db)
+=======
+                await _broadcast_task(session_id, t)
+            await _set_session_status(db, session, "RUNNING")
+            await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
         control.resume_event.set()
         control.cancel_requested = False
@@ -170,12 +204,20 @@ async def _run_loop(session_id: str):
 
             async with AsyncSessionLocal() as db:
                 session = await db.get(Session, session_id)
+<<<<<<< HEAD
                 if session.status != "RUNNING":
+=======
+                if session.status in ("CANCELLED", "COMPLETED", "FAILED"):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                     return
                 if control.cancel_requested:
                     await _set_session_status(db, session, "CANCELLED")
                     await _log_event(db, session_id, "session_cancelled", "human")
+<<<<<<< HEAD
                     await _commit(db)
+=======
+                    await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                     return
 
                 result = await db.execute(select(Task).where(Task.session_id == session_id))
@@ -187,34 +229,56 @@ async def _run_loop(session_id: str):
                         continue
                     deps = t.depends_on or []
                     dep_tasks = [x for x in all_tasks if x.id in deps]
+<<<<<<< HEAD
                     if len(dep_tasks) == len(deps) and all(d.status == "completed" for d in dep_tasks):
+=======
+                    if all(d.status == "completed" for d in dep_tasks):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                         next_task = t
                         break
 
                 if next_task is None:
                     # check if all tasks are completed/skipped -> finish session
                     unfinished = [t for t in all_tasks if t.status in ("pending", "running")]
+<<<<<<< HEAD
                     if not unfinished and all(t.status in ("completed", "skipped") for t in all_tasks):
                         session.current_task_id = None
                         await _set_session_status(db, session, "COMPLETED")
                         await _log_event(db, session_id, "session_completed", "coordinator")
                         await _commit(db)
+=======
+                    if not unfinished:
+                        await _set_session_status(db, session, "COMPLETED")
+                        await _log_event(db, session_id, "session_completed", "coordinator")
+                        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                         return
                     else:
                         # stuck (e.g. failed dependency) — mark failed
                         await _set_session_status(db, session, "FAILED")
                         await _log_event(db, session_id, "session_failed", "coordinator",
                                           details={"reason": "no runnable task but unfinished tasks remain"})
+<<<<<<< HEAD
                         await _commit(db)
+=======
+                        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                         return
 
                 session.current_task_id = next_task.id
                 next_task.status = "running"
                 await db.flush()
+<<<<<<< HEAD
                 await _broadcast_task(db, session_id, next_task)
                 await _log_event(db, session_id, "task_started", next_task.agent, task_id=next_task.id,
                                   details={"name": next_task.name})
                 await _commit(db)
+=======
+                await _broadcast_task(session_id, next_task)
+                await _log_event(db, session_id, "task_started", next_task.agent, task_id=next_task.id,
+                                  details={"name": next_task.name})
+                await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                 goal = session.goal
                 agent = next_task.agent
                 task_id = next_task.id
@@ -223,6 +287,7 @@ async def _run_loop(session_id: str):
             # Execute outside the DB transaction (agent calls may be slow / network)
             try:
                 if agent == "research":
+<<<<<<< HEAD
                     ctx = await _gather_completed_summaries(session_id)
                     output = await workers.run_research(task_name, goal + "\nPrior outputs: " + "\n".join(ctx))
                 elif agent == "verification":
@@ -231,6 +296,15 @@ async def _run_loop(session_id: str):
                 elif agent == "reporter":
                     ctx = await _gather_completed_outputs(session_id)
                     output = await workers.run_reporter(ctx, f"{goal}\nTask: {task_name}")
+=======
+                    output = await workers.run_research(task_name, goal)
+                elif agent == "verification":
+                    ctx = await _gather_completed_summaries(session_id)
+                    output = await workers.run_verification(ctx, goal)
+                elif agent == "reporter":
+                    ctx = await _gather_completed_outputs(session_id)
+                    output = await workers.run_reporter(ctx, goal)
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                 else:
                     output = {"result": "", "explanation": "", "evidence": [],
                               "uncertainty": "high", "limitations": "unknown agent"}
@@ -241,11 +315,19 @@ async def _run_loop(session_id: str):
                     task.status = "failed"
                     task.result = f"Error: {exc}"
                     await db.flush()
+<<<<<<< HEAD
                     await _broadcast_task(db, session_id, task)
                     await _log_event(db, session_id, "task_failed", agent, task_id=task_id,
                                       details={"error": str(exc)})
                     await _set_session_status(db, session, "FAILED")
                     await _commit(db)
+=======
+                    await _broadcast_task(session_id, task)
+                    await _log_event(db, session_id, "task_failed", agent, task_id=task_id,
+                                      details={"error": str(exc)})
+                    await _set_session_status(db, session, "FAILED")
+                    await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                 return
 
             # Reporter output is a consequential action -> gate behind human approval
@@ -260,7 +342,11 @@ async def _run_loop(session_id: str):
                     task.limitations = output["limitations"]
                     # keep status "running" until approved
                     await db.flush()
+<<<<<<< HEAD
                     await _broadcast_task(db, session_id, task)
+=======
+                    await _broadcast_task(session_id, task)
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
                     approval = Approval(
                         id=gen_id("appr"), session_id=session_id, task_id=task_id,
@@ -271,11 +357,18 @@ async def _run_loop(session_id: str):
                     )
                     db.add(approval)
                     await db.flush()
+<<<<<<< HEAD
                     control.resume_event.clear()
                     await _set_session_status(db, session, "AWAITING_APPROVAL")
                     await _log_event(db, session_id, "approval_requested", "reporter", task_id=task_id,
                                       details={"approval_id": approval.id})
                     await _queue(db, session_id, {
+=======
+                    await _set_session_status(db, session, "AWAITING_APPROVAL")
+                    await _log_event(db, session_id, "approval_requested", "reporter", task_id=task_id,
+                                      details={"approval_id": approval.id})
+                    await manager.broadcast(session_id, {
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                         "type": "approval_request",
                         "approval": {
                             "id": approval.id, "session_id": session_id, "task_id": task_id,
@@ -284,8 +377,14 @@ async def _run_loop(session_id: str):
                             "evidence": approval.evidence, "status": "pending",
                         },
                     })
+<<<<<<< HEAD
                     await _commit(db)
                 # Block the loop until approve/reject resumes it (approve/reject flips resume_event)
+=======
+                    await db.commit()
+                # Block the loop until approve/reject resumes it (approve/reject flips resume_event)
+                control.resume_event.clear()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
                 continue
 
             # Normal (non-gated) task completion
@@ -298,6 +397,7 @@ async def _run_loop(session_id: str):
                 task.uncertainty = output["uncertainty"]
                 task.limitations = output["limitations"]
                 await db.flush()
+<<<<<<< HEAD
                 await _broadcast_task(db, session_id, task)
                 await _log_event(db, session_id, "task_completed", agent, task_id=task_id,
                                   details={"name": task_name})
@@ -306,6 +406,14 @@ async def _run_loop(session_id: str):
         return
     except Exception as exc:
         await _fail(session_id, exc)
+=======
+                await _broadcast_task(session_id, task)
+                await _log_event(db, session_id, "task_completed", agent, task_id=task_id,
+                                  details={"name": task_name})
+                await db.commit()
+    except asyncio.CancelledError:
+        return
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
 
 async def _gather_completed_summaries(session_id: str) -> list[str]:
@@ -327,12 +435,17 @@ async def _gather_completed_outputs(session_id: str) -> list[dict]:
         ]
 
 
+<<<<<<< HEAD
 async def _pause_session(session_id: str):
+=======
+async def pause_session(session_id: str):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     control = _get_control(session_id)
     async with AsyncSessionLocal() as db:
         session = await db.get(Session, session_id)
         if session is None:
             raise ValueError("session not found")
+<<<<<<< HEAD
         if session.status == "PAUSED":
             return
         if session.status != "RUNNING":
@@ -356,24 +469,46 @@ async def _pause_session(session_id: str):
 
 
 async def _resume_session(session_id: str):
+=======
+        if session.status != "RUNNING":
+            raise InvalidTransition(session.status, "PAUSED")
+        await _set_session_status(db, session, "PAUSED")
+        await _log_event(db, session_id, "agent_paused", "human")
+        await db.commit()
+    control.resume_event.clear()
+
+
+async def resume_session(session_id: str):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     control = _get_control(session_id)
     async with AsyncSessionLocal() as db:
         session = await db.get(Session, session_id)
         if session is None:
             raise ValueError("session not found")
+<<<<<<< HEAD
         if session.status == "RUNNING":
             return
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         if session.status != "PAUSED":
             raise InvalidTransition(session.status, "RUNNING")
         await _set_session_status(db, session, "RUNNING")
         await _log_event(db, session_id, "agent_resumed", "human")
+<<<<<<< HEAD
         await _commit(db)
+=======
+        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     control.resume_event.set()
     if control.running_task_future is None or control.running_task_future.done():
         control.running_task_future = asyncio.create_task(_run_loop(session_id))
 
 
+<<<<<<< HEAD
 async def _redirect_session(session_id: str, instruction: str, task_id: str | None):
+=======
+async def redirect_session(session_id: str, instruction: str, task_id: str | None):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     """
     Human redirection: only accepted while PAUSED, guaranteeing the execution
     loop is blocked and cannot race this mutation. Backend actually mutates
@@ -393,6 +528,7 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
         target = None
         if task_id:
             target = next((t for t in all_tasks if t.id == task_id), None)
+<<<<<<< HEAD
         if target is not None and target.status == "skipped":
             replacement = next((t for t in all_tasks if t.order_index == target.order_index and t.name == f"[Redirected] {instruction}" and t.status == "pending"), None)
             if replacement:
@@ -405,6 +541,14 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
 
         if target is None or target.status != "pending":
             raise ValueError("only pending tasks can be redirected")
+=======
+        if target is None:
+            # default: the current / next pending task
+            target = next((t for t in all_tasks if t.status in ("running", "pending")), None)
+
+        if target is None:
+            raise ValueError("no redirectable task found")
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
         # Mark the target skipped and insert a new task in its place, preserving
         # dependency edges so downstream tasks (e.g. "Compare results") now wait
@@ -413,7 +557,11 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
         new_task = Task(
             id=gen_id("task"), session_id=session_id,
             name=f"[Redirected] {instruction}", agent=target.agent,
+<<<<<<< HEAD
             status="pending", order_index=target.order_index, depends_on=list(target.depends_on or []),
+=======
+            status="pending", order_index=target.order_index, depends_on=[],
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         )
         db.add(new_task)
         await db.flush()
@@ -423,6 +571,7 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
                 deps = list(t.depends_on)
                 deps = [new_task.id if d == target.id else d for d in deps]
                 t.depends_on = deps
+<<<<<<< HEAD
                 await _broadcast_task(db, session_id, t)
 
         await db.flush()
@@ -435,11 +584,25 @@ async def _redirect_session(session_id: str, instruction: str, task_id: str | No
 
 
 async def _cancel_session(session_id: str):
+=======
+
+        await db.flush()
+        await _broadcast_task(session_id, target)
+        await _broadcast_task(session_id, new_task)
+        await _log_event(db, session_id, "human_redirected", "human", task_id=target.id,
+                          details={"instruction": instruction, "replaced_with": new_task.id})
+        # keep status PAUSED (human must still issue /resume), matches "PAUSED -> PAUSED" allowed transition
+        await db.commit()
+
+
+async def cancel_session(session_id: str):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     control = _get_control(session_id)
     async with AsyncSessionLocal() as db:
         session = await db.get(Session, session_id)
         if session is None:
             raise ValueError("session not found")
+<<<<<<< HEAD
         if session.status == "CANCELLED":
             return
         if session.status in ("COMPLETED", "FAILED"):
@@ -459,25 +622,40 @@ async def _cancel_session(session_id: str):
             await _queue(db, session_id, {"type":"approval_resolved", "approval_id":approval.id,"status":"rejected"})
         await _log_event(db, session_id, "session_cancelled", "human")
         await _commit(db)
+=======
+        if session.status in ("COMPLETED", "FAILED", "CANCELLED"):
+            raise InvalidTransition(session.status, "CANCELLED")
+        await _set_session_status(db, session, "CANCELLED")
+        await _log_event(db, session_id, "session_cancelled", "human")
+        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     control.cancel_requested = True
     control.resume_event.set()  # unblock loop so it can observe cancellation and exit
     if control.running_task_future:
         control.running_task_future.cancel()
 
 
+<<<<<<< HEAD
 async def _approve_action(approval_id: str):
+=======
+async def approve_action(approval_id: str):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     async with AsyncSessionLocal() as db:
         approval = await db.get(Approval, approval_id)
         if approval is None:
             raise ValueError("approval not found")
+<<<<<<< HEAD
         if approval.status == "approved":
             return
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         if approval.status != "pending":
             raise ValueError("approval already resolved")
         approval.status = "approved"
         approval.resolved_at = datetime.now(timezone.utc)
         session = await db.get(Session, approval.session_id)
         task = await db.get(Task, approval.task_id) if approval.task_id else None
+<<<<<<< HEAD
         if session.status != "AWAITING_APPROVAL" or not task or task.status != "running":
             raise InvalidTransition(session.status, "AWAITING_APPROVAL")
         if task:
@@ -491,6 +669,19 @@ async def _approve_action(approval_id: str):
             "approval_id": approval_id, "status": "approved",
         })
         await _commit(db)
+=======
+        if task:
+            task.status = "completed"
+            await _broadcast_task(session.id, task)
+        await _set_session_status(db, session, "RUNNING")
+        await _log_event(db, session.id, "approval_granted", "human", task_id=approval.task_id,
+                          details={"approval_id": approval_id})
+        await manager.broadcast(session.id, {
+            "type": "approval_resolved",
+            "approval_id": approval_id, "status": "approved",
+        })
+        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         session_id = session.id
 
     control = _get_control(session_id)
@@ -499,19 +690,27 @@ async def _approve_action(approval_id: str):
         control.running_task_future = asyncio.create_task(_run_loop(session_id))
 
 
+<<<<<<< HEAD
 async def _reject_action(approval_id: str):
+=======
+async def reject_action(approval_id: str):
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     async with AsyncSessionLocal() as db:
         approval = await db.get(Approval, approval_id)
         if approval is None:
             raise ValueError("approval not found")
+<<<<<<< HEAD
         if approval.status == "rejected":
             return
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
         if approval.status != "pending":
             raise ValueError("approval already resolved")
         approval.status = "rejected"
         approval.resolved_at = datetime.now(timezone.utc)
         session = await db.get(Session, approval.session_id)
         task = await db.get(Task, approval.task_id) if approval.task_id else None
+<<<<<<< HEAD
         if session.status != "AWAITING_APPROVAL" or not task or task.status != "running":
             raise InvalidTransition(session.status, "AWAITING_APPROVAL")
         if task:
@@ -575,3 +774,16 @@ async def approve_action(approval_id):
     await _resolve(approval_id, _approve_action)
 async def reject_action(approval_id):
     await _resolve(approval_id, _reject_action)
+=======
+        if task:
+            task.status = "failed"
+            await _broadcast_task(session.id, task)
+        await _set_session_status(db, session, "FAILED")
+        await _log_event(db, session.id, "approval_rejected", "human", task_id=approval.task_id,
+                          details={"approval_id": approval_id})
+        await manager.broadcast(session.id, {
+            "type": "approval_resolved",
+            "approval_id": approval_id, "status": "rejected",
+        })
+        await db.commit()
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3

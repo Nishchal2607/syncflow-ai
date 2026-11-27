@@ -18,8 +18,11 @@
   },
   "devDependencies": {
     "typescript": "5.6.2",
+<<<<<<< HEAD
     "eslint": "8.57.1",
     "eslint-config-next": "14.2.33",
+=======
+>>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     "@types/node": "20.16.5",
     "@types/react": "18.3.5",
     "@types/react-dom": "18.3.0",
