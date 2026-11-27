@@ -130,6 +130,15 @@ async def reject(approval_id: str, db: AsyncSession = Depends(get_db)):
     return approval
 
 
+@router.get("/api/sessions/{session_id}/approvals", response_model=list[ApprovalOut])
+async def get_approvals(session_id: str, db: AsyncSession = Depends(get_db)):
+    await _load_session(db, session_id)
+    result = await db.execute(select(Approval).where(
+        Approval.session_id == session_id, Approval.status == "pending"
+    ).order_by(Approval.created_at.asc(), Approval.id.asc()))
+    return result.scalars().all()
+
+
 @router.get("/api/sessions/{session_id}/events", response_model=list[EventOut])
 async def get_events(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(

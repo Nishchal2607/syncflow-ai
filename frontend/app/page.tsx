@@ -15,15 +15,20 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const { session, events, pendingApproval, setPendingApproval, refresh } = useSession(sessionId);
+  const { connected, session, events, pendingApproval, setPendingApproval, refresh } = useSession(sessionId);
 
   useEffect(() => {
-    api.health().then((h) => setMode(h.mode)).catch(() => setMode("deterministic_fallback"));
+    setSessionId(localStorage.getItem("syncflow.activeSession"));
+  }, []);
+
+  useEffect(() => {
+    api.health().then((h) => setMode(h.mode)).catch(() => setMode("unavailable"));
   }, []);
 
   const handleNewGoal = async (goal: string) => {
     const s = await api.createSession(goal);
     setSelectedTaskId(null);
+    localStorage.setItem("syncflow.activeSession", s.id);
     setSessionId(s.id); // subscribe first so no early events are missed
     await api.startSession(s.id);
   };
@@ -43,7 +48,7 @@ export default function Home() {
 
   return (
     <div className="workspace">
-      <Sidebar mode={mode} sessionId={sessionId} onNewSession={() => { setSessionId(null); setSelectedTaskId(null); }} />
+      <Sidebar mode={mode} sessionId={sessionId} onNewSession={() => { localStorage.removeItem("syncflow.activeSession"); setSessionId(null); setSelectedTaskId(null); }} />
 
       <main className="workspace-main">
         {!sessionId || !session ? (
@@ -51,10 +56,11 @@ export default function Home() {
         ) : (
           <>
             <header className="workspace-heading"><div><div className="eyebrow">WORKSPACE / ORCHESTRATION</div><h1>Execution overview</h1></div><span className="session-label">Session · {session.id.slice(0, 8)}</span></header>
+            <div role="status">{connected ? "Live connection" : "Disconnected — reconnecting; displayed state may be stale"}</div>
             <ControlBar
               goal={session.goal}
               status={session.status}
-              busy={busy}
+              busy={busy || !connected}
               onPause={() => withBusy(() => api.pauseSession(sessionId))}
               onResume={() => withBusy(() => api.resumeSession(sessionId))}
               onRedirect={(instr) => withBusy(() => api.redirectSession(sessionId, instr))}

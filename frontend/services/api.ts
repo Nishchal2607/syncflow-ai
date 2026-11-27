@@ -1,4 +1,4 @@
-import { SessionData, EventItem } from "@/types";
+import { SessionData, EventItem, Approval } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
@@ -28,6 +28,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ instruction, task_id }),
     }),
+  getApprovals: (id: string) => req<Approval[]>(`/api/sessions/${id}/approvals`),
   getEvents: (id: string) => req<EventItem[]>(`/api/sessions/${id}/events`),
   approve: (approvalId: string) =>
     req(`/api/approvals/${approvalId}/approve`, { method: "POST" }),

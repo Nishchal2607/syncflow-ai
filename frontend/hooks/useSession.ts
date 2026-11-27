@@ -12,14 +12,18 @@ export function useSession(sessionId: string | null) {
   const [session, setSession] = useState<SessionData | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [pendingApproval, setPendingApproval] = useState<Approval | null>(null);
+  const [connected, setConnected] = useState(false);
+  const generation = useRef(0);
   const activeId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const [s, e] = await Promise.all([api.getSession(sessionId), api.getEvents(sessionId)]);
-      if (activeId.current !== sessionId) return; // stale response from a previous session
+      const request = ++generation.current;
+      const [s, e, approvals] = await Promise.all([api.getSession(sessionId), api.getEvents(sessionId), api.getApprovals(sessionId)]);
+      if (activeId.current !== sessionId || request !== generation.current) return; // stale response from a previous session
       setSession(s);
+      setPendingApproval(approvals[0] ?? null);
       setEvents((prev) => mergeEvents(e, prev));
     } catch (err) {
       console.error("refresh failed", err);
@@ -28,6 +32,7 @@ export function useSession(sessionId: string | null) {
 
   useEffect(() => {
     activeId.current = sessionId;
+    setConnected(false);
     // Clear state from the previous session so it never flashes under the new id
     setSession(null);
     setEvents([]);
@@ -40,8 +45,10 @@ export function useSession(sessionId: string | null) {
 
     const connect = () => {
       ws = new WebSocket(`${WS_BASE}/ws/sessions/${sessionId}`);
-      ws.onopen = () => { refresh(); }; // close any gap after (re)connect
+      ws.onopen = () => { if (!closed) { setConnected(true); refresh(); } }; // close any gap after (re)connect
       ws.onmessage = (ev) => {
+        if (closed) return;
+        generation.current++;
         let msg: any;
         try { msg = JSON.parse(ev.data); } catch { return; }
         if (msg.type === "session_status") {
@@ -63,18 +70,21 @@ export function useSession(sessionId: string | null) {
         }
       };
       ws.onclose = () => {
-        if (!closed) retry = setTimeout(connect, 1500);
+        if (!closed) { setConnected(false); retry = setTimeout(connect, 1500); }
       };
     };
     connect();
     refresh();
+    const poll = setInterval(refresh, 3000);
 
     return () => {
       closed = true;
+      generation.current++;
+      clearInterval(poll);
       if (retry) clearTimeout(retry);
       ws?.close();
     };
   }, [sessionId, refresh]);
 
-  return { session, events, pendingApproval, setPendingApproval, refresh };
+  return { connected, session, events, pendingApproval, setPendingApproval, refresh };
 }
