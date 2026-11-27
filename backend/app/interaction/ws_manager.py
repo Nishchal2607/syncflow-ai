@@ -1,8 +1,5 @@
 import json
-<<<<<<< HEAD
 import asyncio
-=======
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 from fastapi import WebSocket
 
 
@@ -25,15 +22,9 @@ class ConnectionManager:
         conns = self.active.get(session_id, [])
         dead = []
         payload = json.dumps(message, default=str)
-<<<<<<< HEAD
         for ws in list(conns):
             try:
                 await asyncio.wait_for(ws.send_text(payload), timeout=2)
-=======
-        for ws in conns:
-            try:
-                await ws.send_text(payload)
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
             except Exception:
                 dead.append(ws)
         for d in dead:

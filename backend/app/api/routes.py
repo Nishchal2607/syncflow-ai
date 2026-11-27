@@ -112,11 +112,8 @@ async def approve(approval_id: str, db: AsyncSession = Depends(get_db)):
         await coordinator.approve_action(approval_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-<<<<<<< HEAD
     except InvalidTransition as e:
         raise HTTPException(status_code=409, detail=str(e))
-=======
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     approval = await db.get(Approval, approval_id)
     return approval
 
@@ -127,11 +124,8 @@ async def reject(approval_id: str, db: AsyncSession = Depends(get_db)):
         await coordinator.reject_action(approval_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-<<<<<<< HEAD
     except InvalidTransition as e:
         raise HTTPException(status_code=409, detail=str(e))
-=======
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
     approval = await db.get(Approval, approval_id)
     return approval
 

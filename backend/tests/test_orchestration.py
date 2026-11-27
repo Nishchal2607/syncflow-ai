@@ -12,10 +12,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_syncflow.db"
 
 import asyncio
 import pytest
-<<<<<<< HEAD
 import pytest_asyncio
-=======
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
 from app.database.db import init_db, AsyncSessionLocal, engine
 from app.database.models import Base, Task
@@ -24,16 +21,11 @@ from app.orchestration.state_machine import can_transition, InvalidTransition
 from sqlalchemy import select
 
 
-<<<<<<< HEAD
 @pytest_asyncio.fixture(autouse=True)
-=======
-@pytest.fixture(autouse=True)
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 async def _fresh_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-<<<<<<< HEAD
     try:
         yield
     finally:
@@ -49,9 +41,6 @@ async def _fresh_db():
         finally:
             coordinator._controls.clear()
             await engine.dispose()
-=======
-    yield
->>>>>>> ff3b8e6d1f4bd3c8d0eb54f5fb1847df4306cdb3
 
 
 async def _poll_status(session_id, target, timeout=10):
