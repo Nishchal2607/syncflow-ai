@@ -9,16 +9,16 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          DEFAULT: "#080a12",
-          panel: "#121420",
-          elevated: "#1b1d2d",
+          DEFAULT: "#f3ede0",
+          panel: "#fbf8f0",
+          elevated: "#eae2d0",
         },
         accent: {
-          DEFAULT: "#8b7cf6",
-          blue: "#6574e9",
+          DEFAULT: "#c79e4e",
+          blue: "#1c4437",
         },
         border: {
-          DEFAULT: "#262941",
+          DEFAULT: "#dcd1ba",
         },
       },
       borderRadius: {

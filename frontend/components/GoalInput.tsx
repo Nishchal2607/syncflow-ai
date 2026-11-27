@@ -29,16 +29,11 @@ export default function GoalInput({ onSubmit }: { onSubmit: (goal: string) => Pr
   return (
     <div className="goal-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-2xl">
-        <div className="inline-flex items-center gap-2 mb-5 rounded-full border border-violet-400/20 bg-violet-400/[0.07] px-3 py-1.5 text-violet-300">
-          <Sparkles size={15} />
-          <span className="text-xs font-semibold tracking-wide">SyncFlow AI</span>
+        <div className="goal-intro">
+          <span><Sparkles size={15} /> START A WORKFLOW</span>
+          <h2>What should your agents work on?</h2>
+          <p>Describe the outcome you need. Follow the workflow, step in when needed, and review the result before approval.</p>
         </div>
-        <h1 className="text-4xl font-semibold tracking-tight text-slate-100 mb-1">
-          Orchestrate with confidence.
-        </h1>
-        <p className="text-sm text-slate-500 mb-6">
-          Submit a complex goal. Watch the plan unfold. Pause, redirect, or approve at any point.
-        </p>
 
         <div className="goal-composer bg-bg-panel border border-border rounded-xl2 p-5 shadow-xl">
           <textarea

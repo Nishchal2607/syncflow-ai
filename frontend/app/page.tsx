@@ -7,6 +7,7 @@ import GoalInput from "@/components/GoalInput";
 import ControlBar from "@/components/ControlBar";
 import WorkflowGraph from "@/components/WorkflowGraph";
 import TaskInspector from "@/components/TaskInspector";
+import ReportPanel from "@/components/ReportPanel";
 import EventTimeline from "@/components/EventTimeline";
 import ApprovalModal from "@/components/ApprovalModal";
 
@@ -45,56 +46,96 @@ export default function Home() {
   };
 
   const selectedTask = session?.tasks.find((t) => t.id === selectedTaskId) || null;
+  const reportTask = session?.tasks.find((task) => task.agent === "reporter") || null;
 
   return (
-    <div className="workspace">
-      <Sidebar mode={mode} sessionId={sessionId} onNewSession={() => { localStorage.removeItem("syncflow.activeSession"); setSessionId(null); setSelectedTaskId(null); }} />
+    <div className="app-shell" id="workspace">
+      <Sidebar sessionId={sessionId} onNewSession={() => { localStorage.removeItem("syncflow.activeSession"); setSessionId(null); setSelectedTaskId(null); }} />
 
       <main className="workspace-main">
+        <section className="hero-banner">
+          <div className="hero-copy">
+            <div className="hero-eyebrow">HUMAN-AGENT WORKSPACE</div>
+            <h1>Change the direction.<br /><em>See what moves.</em></h1>
+            <p>Follow each step, steer the work while it runs, and review the result before you approve it.</p>
+          </div>
+          {session && (
+            <div className="hero-session">
+              <span className={`connection-status ${connected ? "is-connected" : "is-disconnected"}`} role="status">
+                <i />{connected ? "Live connection" : "Reconnecting · state may be stale"}
+              </span>
+              <span className="session-label">SESSION / {session.id.slice(0, 8).toUpperCase()}</span>
+            </div>
+          )}
+        </section>
+
         {!sessionId || !session ? (
-          <GoalInput onSubmit={handleNewGoal} />
+          <div className="new-goal-wrap"><GoalInput onSubmit={handleNewGoal} /></div>
         ) : (
           <>
-            <header className="workspace-heading">
-              <div>
-                <div className="eyebrow">WORKSPACE / ORCHESTRATION</div>
-                <h1>Execution overview</h1>
+          <section className="dashboard-grid">
+            <aside className="requirements-rail" aria-label="Goal and workflow controls">
+              <div className="rail-section">
+                <div className="rail-kicker">YOUR REQUIREMENT</div>
+                <h2>Active goal</h2>
+                <p className="rail-goal">{session.goal}</p>
               </div>
-              <span className="session-label rounded-full border border-border bg-bg-panel px-3 py-1.5">
-                Session · {session.id.slice(0, 8)}
-              </span>
-            </header>
-            <div className="connection-status" role="status">
-              <span className={`connection-dot ${connected ? "" : "offline"}`} />
-              {connected ? "Live connection" : "Reconnecting — displayed state may be stale"}
-            </div>
-            <ControlBar
-              goal={session.goal}
-              status={session.status}
-              busy={busy || !connected}
-              onPause={() => withBusy(() => api.pauseSession(sessionId))}
-              onResume={() => withBusy(() => api.resumeSession(sessionId))}
-              onRedirect={(instr) => withBusy(() => api.redirectSession(sessionId, instr))}
-              onCancel={() => withBusy(() => api.cancelSession(sessionId))}
-            />
+              <ControlBar
+                goal=""
+                status={session.status}
+                busy={busy || !connected}
+                onPause={() => withBusy(() => api.pauseSession(sessionId))}
+                onResume={() => withBusy(() => api.resumeSession(sessionId))}
+                onRedirect={(instr) => withBusy(() => api.redirectSession(sessionId, instr))}
+                onCancel={() => withBusy(() => api.cancelSession(sessionId))}
+              />
+              <div className="rail-note">
+                <strong>Human control</strong>
+                <span>Pause at a checkpoint, redirect pending work, then resume when you are ready.</span>
+              </div>
+            </aside>
 
-            <div className="metrics">{[{label:"Total tasks",value:session.tasks.length},{label:"Completed",value:session.tasks.filter(t=>t.status === "completed").length},{label:"Running",value:session.tasks.filter(t=>t.status === "running").length},{label:"Progress",value:`${session.tasks.length ? Math.round(session.tasks.filter(t=>t.status === "completed").length / session.tasks.length * 100) : 0}%`}].map(m=><div className="metric" key={m.label}><span>{m.label}</span><strong>{m.value}</strong></div>)}</div>
-            <div className="execution-grid">
-              <div className="graph-panel panel">
+            <section className="workflow-column" id="workflow" aria-label="Live workflow">
+              <div className="workflow-summary">
+                <div>
+                  <span className="section-kicker">LIVE EXECUTION</span>
+                  <h2>Agent workflow</h2>
+                </div>
+                <span className={`status-pill status-${session.status.toLowerCase()}`}>
+                  <i />{session.status.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="metrics">
+                {[
+                  { label: "Tasks", value: session.tasks.length },
+                  { label: "Completed", value: session.tasks.filter((t) => t.status === "completed").length },
+                  { label: "In progress", value: session.tasks.filter((t) => t.status === "running").length },
+                  { label: "Progress", value: `${session.tasks.length ? Math.round(session.tasks.filter((t) => t.status === "completed").length / session.tasks.length * 100) : 0}%` },
+                ].map((metric) => (
+                  <div className="metric" key={metric.label}>
+                    <span>{metric.label}</span><strong>{metric.value}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="graph-panel paper-panel">
                 <WorkflowGraph
                   tasks={session.tasks}
                   selectedId={selectedTaskId}
                   onSelect={setSelectedTaskId}
                 />
               </div>
-              <div className="inspector-panel panel">
+            </section>
+
+            <aside className="proof-column" aria-label="Inspect and verify workflow">
+              <div className="proof-panel paper-panel">
                 <TaskInspector task={selectedTask} />
               </div>
-            </div>
-
-            <div className="timeline-panel panel">
-              <EventTimeline events={events} />
-            </div>
+              <div className="timeline-panel paper-panel" id="activity">
+                <EventTimeline events={events} />
+              </div>
+            </aside>
+          </section>
+          <ReportPanel task={reportTask} sourceTasks={session.tasks} mode={mode} />
           </>
         )}
       </main>

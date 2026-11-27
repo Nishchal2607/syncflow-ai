@@ -38,13 +38,6 @@ export default function TaskInspector({ task }: { task: Task | null }) {
         </div>
       )}
 
-      {task.result && (
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Result</div>
-          <div className="text-slate-200 leading-relaxed break-words">{task.result}</div>
-        </div>
-      )}
-
       {task.explanation && (
         <div>
           <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Decision explanation</div>

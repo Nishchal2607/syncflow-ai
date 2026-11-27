@@ -31,16 +31,16 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
     <div
       className="workflow-node rounded-xl2 border px-4 py-3 w-56 shadow-lg transition-all"
       style={{
-        background: "#161c25",
-        borderColor: selected ? "#8b7cf6" : "#30334b",
-        boxShadow: task.status === "running" ? `0 0 0 1px ${color}, 0 0 14px ${color}55` : undefined,
+        background: "#fbf8f0",
+        borderColor: selected ? "#c79e4e" : "#dcd1ba",
+        boxShadow: task.status === "running" ? `0 0 0 2px ${color}99, 0 8px 20px ${color}22` : undefined,
         opacity: task.status === "skipped" ? 0.45 : 1,
       }}
     >
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-400">
+        <div className="node-agent flex items-center gap-1.5 text-[11px] uppercase tracking-wide">
           <Icon size={12} />
           {task.agent}
         </div>
@@ -51,7 +51,7 @@ function TaskNode({ data }: { data: { task: Task; selected: boolean } }) {
           {task.status}
         </span>
       </div>
-      <div className="text-sm text-slate-100 leading-snug">{task.name}</div>
+      <div className="node-title text-sm leading-snug">{task.name}</div>
     </div>
   );
 }
@@ -62,7 +62,7 @@ const nodeTypes = { taskNode: TaskNode };
 function RefitOnChange({ count }: { count: number }) {
   const { fitView } = useReactFlow();
   useEffect(() => {
-    const t = setTimeout(() => fitView({ padding: 0.2, duration: 250 }), 50);
+    const t = setTimeout(() => fitView({ padding: 0.08, duration: 250 }), 50);
     return () => clearTimeout(t);
   }, [count, fitView]);
   return null;
@@ -72,15 +72,25 @@ export default function WorkflowGraph({
 }: { tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
   const { nodes, edges } = useMemo(() => {
     const sorted = [...tasks].sort((a, b) => a.order_index - b.order_index);
-    const colWidth = 290;
-    const nodes: Node[] = sorted.map((t, i) => ({
-      id: t.id,
-      type: "taskNode",
-      position: { x: i * colWidth, y: (i % 2) * 125 },
-      data: { task: t, selected: t.id === selectedId },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-    }));
+    const depthById = new Map<string, number>();
+    const rowByDepth = new Map<number, number>();
+    const nodes: Node[] = sorted.map((t) => {
+      const depth = (t.depends_on || []).reduce(
+        (max, dependencyId) => Math.max(max, (depthById.get(dependencyId) ?? -1) + 1),
+        0,
+      );
+      const row = rowByDepth.get(depth) ?? 0;
+      depthById.set(t.id, depth);
+      rowByDepth.set(depth, row + 1);
+      return {
+        id: t.id,
+        type: "taskNode",
+        position: { x: depth * 270, y: row * 135 },
+        data: { task: t, selected: t.id === selectedId },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      };
+    });
     const edges: Edge[] = [];
     sorted.forEach((t) => {
       (t.depends_on || []).forEach((dep) => {
@@ -89,8 +99,8 @@ export default function WorkflowGraph({
           source: dep,
           target: t.id,
           animated: t.status === "running",
-          style: { stroke: t.status === "running" ? "#22d3ee" : "#52647d", strokeWidth: 1.8 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: "#334155" },
+          style: { stroke: t.status === "running" ? "#c79e4e" : "#789184", strokeWidth: 1.8 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: "#789184" },
         });
       });
     });
@@ -109,7 +119,7 @@ export default function WorkflowGraph({
         minZoom={0.3}
       >
         <RefitOnChange count={tasks.length} />
-        <Background color="#1b2330" gap={18} />
+        <Background color="#dcd1ba" gap={18} />
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable nodeColor={(n) => STATUS_COLOR[n.data?.task?.status] || "#475569"} maskColor="rgba(8,13,23,.65)" />
       </ReactFlow>

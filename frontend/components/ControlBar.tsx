@@ -17,7 +17,7 @@ const STATUS_STYLE: Record<SessionStatus, string> = {
 export default function ControlBar({
   goal, status, onPause, onResume, onRedirect, onCancel, busy,
 }: {
-  goal: string;
+  goal?: string;
   status: SessionStatus;
   onPause: () => void;
   onResume: () => void;
@@ -34,11 +34,11 @@ export default function ControlBar({
   const canCancel = !["COMPLETED", "FAILED", "CANCELLED"].includes(status);
 
   return (
-    <div className="control-bar panel">
-      <div className="flex-1 min-w-0">
+    <div className="control-bar">
+      {goal && <div className="flex-1 min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-slate-500">Goal</div>
         <div className="text-sm text-slate-200 break-words">{goal}</div>
-      </div>
+      </div>}
 
       <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_STYLE[status]}`}>
         {busy && <Loader2 size={11} className="inline mr-1 animate-spin" />}

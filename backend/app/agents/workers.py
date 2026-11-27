@@ -8,9 +8,10 @@ clearly labelled as a deterministic demonstration rather than live retrieval,
 per the "do not fabricate evidence" rule.
 """
 import asyncio
+import json
 import os
 from datetime import datetime, timezone
-from app.agents.llm_client import complete_json, is_live
+from app.agents.llm_client import MODEL, PROVIDER, complete_json, is_live
 from app.evidence import retrieve, verify_claim
 
 # Deterministic-mode tasks are near-instant by default, which leaves no real
@@ -106,15 +107,46 @@ independent live fact-checking, unless real tools are available to you."""
 
 
 async def run_reporter(all_results: list[dict], goal: str) -> dict:
-    system = """You are the Reporter Agent in SyncFlow AI. Produce a final
-structured report synthesizing all prior agent outputs for the user's goal.
-Return JSON:
-{"result": "the final report, 4-8 sentences", "explanation": "how it was assembled",
- "evidence": ["source 1", "source 2"], "uncertainty": "low|medium|high",
- "limitations": "..."}"""
+    system = """You are the Reporter Agent in SyncFlow AI. Produce a clear,
+detailed answer to the user's goal using only the supplied agent outputs.
+Return JSON with:
+{"result": "the direct answer, with a concise summary, detailed findings, and useful next steps",
+ "explanation": "a detailed account of the inputs used, the role of each agent,
+ how findings were compared or checked, and which tools were or were not used",
+ "evidence": ["only evidence items present in the supplied agent outputs"],
+ "uncertainty": "low|medium|high", "limitations": "specific caveats"}
+
+Do not invent facts, statistics, citations, URLs, source names, or tools.
+The workflow has no live web search or browsing tool. Distinguish model
+reasoning from independently verified evidence. If source evidence is missing
+or weak, say so plainly and set uncertainty to high. Write the answer and
+explanation in readable prose with short paragraphs, not markdown code blocks."""
     if is_live():
-        joined = "\n".join(f"- [{r.get('agent')}] {r.get('result', '')}" for r in all_results)
-        result = await complete_json(system, f"Goal: {goal}\nPrior outputs:\n{joined}")
+        report_context = {
+            "goal": goal,
+            "provider": PROVIDER,
+            "model": MODEL,
+            "available_tools": [
+                f"{PROVIDER} API for language generation using {MODEL}",
+                "No live web search or browsing tool is configured",
+            ],
+            "prior_agent_outputs": [
+                {
+                    "agent": item.get("agent"),
+                    "result": item.get("result", ""),
+                    "explanation": item.get("explanation", ""),
+                    "evidence": item.get("evidence", []),
+                    "uncertainty": item.get("uncertainty", "unknown"),
+                    "limitations": item.get("limitations", ""),
+                }
+                for item in all_results
+            ],
+        }
+        result = await complete_json(
+            system,
+            json.dumps(report_context, ensure_ascii=False, default=str),
+            max_tokens=2800,
+        )
         if result and "result" in result:
             return {
                 "result": result.get("result", ""),

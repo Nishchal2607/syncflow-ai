@@ -24,10 +24,10 @@ const LABELS: Record<string, string> = {
 const parseTs = (ts: string) => new Date(/([zZ]|[+-]\d{2}:?\d{2})$/.test(ts) ? ts : `${ts}Z`);
 
 const dotColor = (t: string) =>
-  /failed|rejected|cancelled/.test(t) ? "#fb7185"
-  : /completed|granted/.test(t) ? "#34d399"
-  : /approval|paused|redirect/.test(t) ? "#fbbf24"
-  : "#38bdf8";
+  /failed|rejected|cancelled/.test(t) ? "#a84d3e"
+  : /completed|granted/.test(t) ? "#2c5a4a"
+  : /approval|paused|redirect/.test(t) ? "#c79e4e"
+  : "#789184";
 export default function EventTimeline({ events }: { events: EventItem[] }) {
   const ordered = [...events].reverse();
   return (
